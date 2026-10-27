@@ -1,0 +1,53 @@
+pondname,Annulatum Larvae,Maculatum Eggs/Spermatophores,Length,Width,Area,Canopy,Hydroperiod
+Pond-1,Y,Y,19,16,304,,perm
+Pond-2,Y,Y,10,9,90,,ephem
+Pond-3,N,Y,13,11,143,,perm
+Pond-4,N,Y,18,14,252,,perm
+Pond-5,N,Y,12,9,108,,perm
+Caldera,N,Y,22,14,308,,perm
+TireRut 1218,N,N,3,2,6,,ephem
+LPond,Y,Y,30,12,360,,perm
+EggPond,Y,Y,27,12,324,,perm
+Erlenmeyer,N,Y,45,25,1125,,perm
+DryPond,N,N,3,3,9,,ephem
+DoubleRavine,N,N,9,7,63,,ephem
+RASYPond,N,N,9,9,81,,ephem
+ValleyPond,N,N,5,3,15,,ephem
+TreeRootPond,N,N,6,4,24,,ephem
+HorseCamp,N,Y,14,12,168,,perm
+SmallPond,N,Y,13,9,117,,perm
+MatVegPond,N,Y,19,16,304,,perm
+ColdPond,Y,Y,19,17,323,,perm
+Snowman,N,N,0,0,0,,ephem
+FarPond,N,Y,19,15,285,,perm
+PrivateDump,,,,,,,
+TurkeyPond,Y,Y,9,6,54,,ephem
+ToadPines,N,Y,19,14,266,,perm
+Campkettle,N,Y,24,16,384,,perm
+Teacup,N,Y,7,5,35,,ephem
+FlatPond,N,N,4,4,16,,ephem
+ShedPond,N,Y,12,11,132,,perm
+ShedTwoPond,N,N,4,2,8,,ephem
+ParkingLot,N,Y,24,21,504,,perm
+DevilsHeaven,N,N,11,9,99,,perm
+Forgotten,N,N,23,19,437,,perm
+Old Dead,N,N,27,22,594,,perm
+ButterflyPond,N,Y,18,17,306,,perm
+Roadside,N,Y,24,16,384,,perm
+BigBurmPond,N,N,49,32,1568,,perm
+Puddle1223,N,N,3,1,3,,ephem
+Road Rut near Big Burm,N,N,5,1,5,,ephem
+Mystery,N,Y,12,7,84,,perm
+North Ridge,Y,Y,24,12,288,,perm
+Persimmon,N,N,15,10,150,,ephem
+Tire Rut by P4,N,N,4,1,4,,ephem
+TrashbyP2,N,N,4,2,8,,ephem
+P-1 Kiddie Far Edge,N,N,1,1,1,,ephem
+Dead Pine,N,N,20,20,400,,perm
+Boundary,N,Y,13,12,156,,perm
+Creek Bottom,N,Y,19,13,247,,perm
+Cedar,N,Y,14,9,126,,perm
+Crk Puddle,N,N,1,1,1,,ephem
+Clearing,N,N ,9,7,63,,perm
+ToadPines2,N,Y,18,13,234,,perm
+TomPond,N,Y,12,17,204,,perm
