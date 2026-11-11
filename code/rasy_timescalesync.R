@@ -1,5 +1,6 @@
 ###Author: Tom Anderson
-###Last Updated: March 9, 2026
+###Last Updated: November 3, 2026
+
 library(ggplot2)
 library(wsyn)
 library(plyr)
@@ -44,19 +45,75 @@ ggplot(rasy_long,aes(Year,Count,color=pondname))+
   scale_x_continuous(breaks=seq(2006,2026,1),labels=c("2006",rep("",3),"2010",rep("",3),"2014",rep("",3),"2018",rep("",3),"2022",rep("",3),"2026"))
 #dev.off()
 
+
+# Assess data completeness ------------------------------------------------
+
+#assess missing values and 0 inflation
+source("code/sync_data_assessment.R")
+rasy.wide<-rasy%>%
+  select(pondname,X2006:X2026)
+m <- prep_wide(rasy.wide, site_col = "pondname")
+
+site_summary(m)            # per-site years, gaps, completeness, zeros
+year_summary(m)            # per-year sites surveyed, zeros
+sites_by_years(m)          # sites with >= X years (any vs consecutive)
+
+# zero inflation: first look, then choose a cutoff
+zero_summary(m)
+plot_zeros(m, cutoffs = c(0.25, 0.5))
+compare_zero_tolerance(m, cutoffs = c(0.25, 0.5, 0.75, 1), min_len = 10)
+
+# imputation tolerance (default is 90% complete)
+compare_missing_tolerance(m, completeness = c(1, 0.9), min_len = 10)
+
+# main trade-off with chosen rules
+tr <- window_tradeoff(m, min_len = 10, min_complete = 0.9, max_zero_prop = 0.5)
+tr[tr$pareto, ]
+plot_tradeoff(tr)
+
+# chosen option, e.g. 17 years (use the SAME rules throughout):
+best <- tr[tr$n_years == 21, ]
+plot_coverage(m, best$start, best$end, min_complete = 0.9, max_zero_prop = 0.5)
+dat_use <- window_sites(m, best$start, best$end, min_complete = 0.9,
+                        max_zero_prop = 0.5)
+attr(dat_use, "site_stats")       # NAs and zeros per site in the window
+attr(dat_use, "n_NA_remaining")   # values to impute
+
+rules <- list(min_complete = 0.9, max_zero_prop = 0.4, min_nonzero = 8)
+start <- 2006; end <- 2026          # your chosen window
+
+sel <- do.call(window_sites, c(list(m, start, end), rules))
+
+keep_sites <- rownames(sel)
+keep_years <- start:end
+
+eggs_use <- rasy_long |>
+  filter(as.character(pondname) %in% keep_sites,
+         Year >= start, Year <= end)
+
+#best option is 21 years for 21 sites (2001-2026)
+
+
 # Timescale of Synchrony --------------------------------------------------
 #extract time series into a matrix spanning all yrs, dropping ponds where no RASY were ever observed (N = 22 ponds)
-rasy_comp <- rasy %>%
-  filter(if_all(X2006:X2026, ~ !is.na(.)))%>%
-  filter(if_any(X2006:X2026, ~ . != 0))
+# rasy_comp <- egg_use %>%
+#   filter(if_all(X2006:X2026, ~ !is.na(.)))%>%
+#   filter(if_any(X2006:X2026, ~ . != 0)) #not needed anymore
+rasy_comp<-eggs_use%>%
+  pivot_wider(names_from = "Year",values_from = "Count")%>%
+  mutate(
+    .row_mean = rowMeans(across(-pondname), na.rm = TRUE),
+    across(-c(pondname, .row_mean), ~ coalesce(.x, .row_mean))
+  ) %>%
+  select(-.row_mean)
 rasy_compmat <- rasy_comp %>%
-  select(X2006:X2026)
+  select(-pondname)
 
 #plot complete time series
-rasy_comp%>%
-  select(pondname,X2006:X2026)%>%
-  pivot_longer(X2006:X2026,names_to="Year",values_to="Count")%>%
-  mutate(Year=as.numeric(sub('X', '', Year)))%>%
+eggs_use%>%
+  #select(pondname,X2006:X2026)%>%
+  #pivot_longer(X2006:X2026,names_to="Year",values_to="Count")%>%
+  #mutate(Year=as.numeric(sub('X', '', Year)))%>%
   ggplot(aes(Year,Count,color=pondname))+
   geom_point(show.legend = F)+
   geom_line(aes(color=pondname),show.legend = F)+
@@ -65,44 +122,49 @@ rasy_comp%>%
   theme(axis.text=element_text(size=14),axis.title=element_text(size=17))+
   scale_x_continuous(breaks=seq(2006,2026,1),labels=c("2006",rep("",3),"2010",rep("",3),"2014",rep("",3),"2018",rep("",3),"2022",rep("",3),"2026"))
 
-
 #same as before but separating by hydroperiod (permanent vs ephemeral ponds)
 #to examine whether wmfs differ by hydroperiod
-rasy_matperm <- rasy_comp %>%
-  filter(Hydroperiod=="perm") %>%
-  select(X2006:X2026)
-rasy_matephem <- rasy_comp %>%
-  filter(Hydroperiod=="ephem") %>%
-  select(X2006:X2026)
+# rasy_matperm <- rasy_comp %>%
+#   filter(Hydroperiod=="perm") %>%
+#   select(X2006:X2026)
+# rasy_matephem <- rasy_comp %>%
+#   filter(Hydroperiod=="ephem") %>%
+#   select(X2006:X2026)
 
 #standarize data sets using Box-Cox transformation
 years<-2006:2026
 years1<-2006:2025 #for use with predictors that only go to 2020
 rasy_dt<-cleandat(as.matrix(rasy_compmat),clev=5,times=years)
-rasyperm_dt<-cleandat(as.matrix(rasy_matperm),clev=5,times=years)
-rasyephem_dt<-cleandat(as.matrix(rasy_matephem),clev=5,times=years)
+# rasyperm_dt<-cleandat(as.matrix(rasy_matperm),clev=5,times=years)
+# rasyephem_dt<-cleandat(as.matrix(rasy_matephem),clev=5,times=years)
 
 #wavelet phasor mean fields- phase synchrony 
-#png('rasy_wpmf.png',res=500,height=4,width=5,units="in")
+png('results/mo_wpmf.png',res=500,height=4,width=5,units="in")
+
+#load custom plotting code
+source('C:/Users/thander/OneDrive - Southern Illinois University Edwardsville/Documents/Projects/RASY/Analysis/wmf_plotting.R')
+
 rasy.wpmf<-wpmf(rasy_dt$cdat,times=years,sigmethod = "quick")
-rasyperm.wpmf<-wpmf(rasyperm_dt$cdat,times=years,sigmethod = "quick")
-rasyephem.wpmf<-wpmf(rasyephem_dt$cdat,times=years,sigmethod = "quick")
+# rasyperm.wpmf<-wpmf(rasyperm_dt$cdat,times=years,sigmethod = "quick")
+# rasyephem.wpmf<-wpmf(rasyephem_dt$cdat,times=years,sigmethod = "quick")
 par(mfrow=c(1,3))
 plotmag(rasy.wpmf,sigthresh = 0.99,las=1,title="all")
-plotmag(rasyperm.wpmf,sigthresh = 0.99,las=1,title = "perm")
-plotmag(rasyephem.wpmf,sigthresh = 0.99,las=1,title = "ephem")
-
-#dev.off()
+# plotmag(rasyperm.wpmf,sigthresh = 0.99,las=1,title = "perm")
+# plotmag(rasyephem.wpmf,sigthresh = 0.99,las=1,title = "ephem")
+mo_wpmf<-plotwmf_gg(rasy.wpmf,sigthresh = 0.99)
+mo_wpmf
+dev.off()
 
 #wavelet mean fields
 rasy.wmf<-wmf(rasy_dt$cdat,times=years)
-rasyperm.wmf<-wmf(rasyperm_dt$cdat,times=years)
-rasyephem.wmf<-wmf(rasyephem_dt$cdat,times=years)
+# rasyperm.wmf<-wmf(rasyperm_dt$cdat,times=years)
+# rasyephem.wmf<-wmf(rasyephem_dt$cdat,times=years)
 
 png('rasy_wmf.png',res=500,height=4,width=5,units="in")
 plotmag(rasy.wmf,title="all")
-plotmag(rasyperm.wmf,title="perm")
-plotmag(rasyephem.wmf,title="ephem")
+# plotmag(rasyperm.wmf,title="perm")
+# plotmag(rasyephem.wmf,title="ephem")
+plotwmf_gg(rasy.wmf)
 
 dev.off()
 

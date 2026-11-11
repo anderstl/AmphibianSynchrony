@@ -65,7 +65,7 @@ rasy_mat <- rasy %>%
 #perform cross correlation analysis
 rasy.syn<-Sncf(x=rasy$Longitude,
                y=rasy$Latitude,na.rm=T,
-               z=rasy_mat,resamp = 1000,latlon = T,quiet=T)
+               z=rasy_compmat,resamp = 1000,latlon = T,quiet=T)
 
 #find degree of synchrony across study area
 summary(rasy.syn)$Regional.sync #0.12
@@ -105,17 +105,108 @@ ggplot()+
   theme(axis.text=element_text(size=14),axis.title=element_text(size=17))
 dev.off()
 
+#perform cross correlation analysis on complete time series (rasy_comp from timescale code)
+gps<-rasy%>%
+  filter(pondname%in%c(unique(rasy_comp$pondname)))%>%
+  select(pondname,Latitude,Longitude)%>%
+  arrange(pondname)
+
+rasy.syn<-Sncf(x=gps$Longitude,
+               y=gps$Latitude,na.rm=T,
+               z=rasy_compmat,resamp = 1000,latlon = T,quiet=T)
+
+#find degree of synchrony across study area
+summary(rasy.syn)$Regional.sync #0.12
+
+#png("rasy_sncf.png",res=500,height=5,width=5,units="in")
+par(mar=c(4,5,2,1))
+plot(rasy.syn,xlab="Distance (km)",cex.lab=1.5,cex.axis=1.25,las=1,ylim=c(-1,1))
+title(main="DBCA Wood Frog Egg Mass Counts, 2006-2026",cex=0.5)
+#dev.off()
+
+#manually plot geographic distance vs correlation
+distmat<-gcdist(gps$Longitude,gps$Latitude)
+cormat <- cor(t(as.matrix(rasy_compmat)), method="pearson")
+diag(cormat) <- NA
+
+png("results/rasycomp_dist.png",res=500,height=5,width=5,units="in")
+mo_sncf<-ggplot()+
+  geom_ribbon(aes(x=as.vector(rasy.syn$boot$boot.summary$predicted$x),
+                  ymin = as.vector(rasy.syn$boot$boot.summary$predicted$y[2,]),
+                  ymax = as.vector(rasy.syn$boot$boot.summary$predicted$y[10,])),fill="gray")+
+  geom_point(aes(as.vector(distmat),as.vector(cormat)),shape=21,fill="cornflowerblue")+
+  labs(y="Pearson Correlation",x="Distance (km)")+
+  geom_line(aes(as.vector(rasy.syn$real$predicted$x),as.vector(rasy.syn$real$predicted$y)),size=1)+
+  theme_classic()+
+  scale_x_continuous(breaks=seq(0,3.5,0.5),limits=c(0,3.5))+
+  scale_y_continuous(breaks=seq(-0.75,1,.25),limits=c(-0.75,1))+
+  geom_hline(yintercept=0)+
+  theme(axis.text=element_text(size=14),axis.title=element_text(size=17))
+mo_sncf
+dev.off()
+saveRDS(mo_sncf,'results/mo_sncf.rds')
 # Geography of Synchrony --------------------------------------------------
+m <- prep_wide(rasy.wide, site_col = "pondname")
+
+site_summary(m)            # per-site years, gaps, completeness, zeros
+year_summary(m)            # per-year sites surveyed, zeros
+sites_by_years(m)          # sites with >= X years (any vs consecutive)
+
+# zero inflation: first look, then choose a cutoff
+zero_summary(m)
+plot_zeros(m, cutoffs = c(0.25, 0.5))
+compare_zero_tolerance(m, cutoffs = c(0.25, 0.5, 0.75, 1), min_len = 10)
+
+# imputation tolerance (default is 90% complete)
+compare_missing_tolerance(m, completeness = c(1, 0.9), min_len = 10)
+
+# main trade-off with chosen rules
+tr <- window_tradeoff(m, min_len = 10, min_complete = 0.9, max_zero_prop = 0.5)
+tr[tr$pareto, ]
+plot_tradeoff(tr)
+
+# chosen option, e.g. 17 years (use the SAME rules throughout):
+best <- tr[tr$n_years == 17, ]
+plot_coverage(m, best$start, best$end, min_complete = 0.9, max_zero_prop = 0.5)
+dat_use <- window_sites(m, best$start, best$end, min_complete = 0.9,
+                        max_zero_prop = 0.5)
+attr(dat_use, "site_stats")       # NAs and zeros per site in the window
+attr(dat_use, "n_NA_remaining")   # values to impute
+
+rules <- list(min_complete = 0.9, max_zero_prop = 0.5, min_nonzero = 8)
+start <- 2010; end <- 2026          # your chosen window
+
+sel <- do.call(window_sites, c(list(m, start, end), rules))
+
+keep_sites <- rownames(sel)
+keep_years <- start:end
+
+eggs_use <- rasy_long |>
+  filter(as.character(pondname) %in% keep_sites,
+         Year >= start, Year <= end)
+#24 sites for 17 years which drops zero inflated ponds and too many NA values
 
 #Truncate data to 2010-present to include more ponds (n =32 ponds)
-rasy_17yr <- rasy %>%
-  filter(if_all(X2010:X2026, ~ !is.na(.)))%>%
-  filter(if_any(X2010:X2026, ~ . != 0))
-rasy_17yr_mat<-rasy_17yr%>%
+rasy_17yr<-eggs_use%>%
+  pivot_wider(names_from = "Year",values_from = "Count",names_prefix = "X")%>%
+  mutate(
+    .row_mean = rowMeans(across(-pondname), na.rm = TRUE),
+    across(-c(pondname, .row_mean), ~ coalesce(.x, .row_mean))
+  ) %>%
+  select(-.row_mean)%>%
+  left_join(rasy %>% select(pondname, Latitude, Longitude),by="pondname")
+rasy_17yr_mat <- rasy_17yr %>%
   select(X2010:X2026)
 
+#Truncate data to 2010-present to include more ponds (n =32 ponds)
+# rasy_17yr <- rasy %>%
+#   filter(if_all(X2010:X2026, ~ !is.na(.)))%>%
+#   filter(if_any(X2010:X2026, ~ . != 0))
+# rasy_17yr_mat<-rasy_17yr%>%
+#   select(X2010:X2026)
+
 #Scale data
-rasy_17yr_dt<-cleandat(as.matrix(rasy_17yr_mat),times=2010:2026,clev=3)
+rasy_17yr_dt<-cleandat(as.matrix(rasy_17yr_mat),times=2010:2026,clev=5)
 rasy.syn17yr<-Sncf(x=rasy_17yr$Longitude,
                    y=rasy_17yr$Latitude,
                    z=rasy_17yr_dt$cdat,resamp = 100,latlon = T,quiet=T)
@@ -326,7 +417,7 @@ topomrm2
 ## -----------------------------------------------------------------------
 ## PART 3. Pairwise tail-dependent synchrony matrices across all ponds
 ## -----------------------------------------------------------------------
-source('Fns_taildependence.R')
+#source('Fns_taildependence.R')
 source('code/tail_functions.R')
 
 pond_ids <- rasy_17yr$pondname
@@ -675,13 +766,13 @@ abline(v=clustsig.rasy$datmod_long,col="blue")
 
 text(x=0.1,y=250,"P = 0.95")
 
-source("../../jasperridge/plotClusterMap_JRG.R")
-par(mfrow=c(1,1))
-plotClusterMap(rasy.xwtclust, 
-               nodewgt=NULL, 
-               edgewgt=0.9, 
-               nodesize=c(2,2), 
-               edgesize = c(0.5,0.5), 
-               addlegend = T,
-               nodechar=c(1,2))
+# source("../../jasperridge/plotClusterMap_JRG.R")
+# par(mfrow=c(1,1))
+# plotClusterMap(rasy.xwtclust, 
+#                nodewgt=NULL, 
+#                edgewgt=0.9, 
+#                nodesize=c(2,2), 
+#                edgesize = c(0.5,0.5), 
+#                addlegend = T,
+#                nodechar=c(1,2))
 
