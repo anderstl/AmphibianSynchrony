@@ -6,6 +6,9 @@ library(maps)
 RASY_shape <- st_read(dsn = "C:/Users/thander/OneDrive - Southern Illinois University Edwardsville/Documents/Projects/RASY/Analysis/iucn_shapefiles/",
                       layer = "data_0")
 
+#load sites
+sites<-read.csv('data/coords.csv')
+
 # Make the sites an sf object (x = longitude, y = latitude; WGS84 decimal degrees)
 sites_sf <- st_as_sf(sites, coords = c("Longitude", "Latitude"), crs = 4326)
 

@@ -58,7 +58,7 @@ dat_use <- window_sites(m, best$start, best$end, min_complete = 0.9,
 attr(dat_use, "site_stats")       # NAs and zeros per site in the window
 attr(dat_use, "n_NA_remaining")   # values to impute
 
-rules <- list(min_complete = 0.9, max_zero_prop = 0.4, min_nonzero = 8)
+rules <- list(min_complete = 0.9, max_zero_prop = 0.5, min_nonzero = 8)
 start <- 2006; end <- 2026          # your chosen window
 
 sel <- do.call(window_sites, c(list(m, start, end), rules))
@@ -94,9 +94,11 @@ rasy_comp<-eggs_use%>%
   ) %>%
   select(-.row_mean)
 
+rasy_comp<-merge(rasy_comp,rasy[,c("pondname","Hydroperiod")],by="pondname")
+
 #convert to matrix
 rasy_compmat <- rasy_comp %>%
-  select(-pondname)
+  select(-c(pondname,Hydroperiod))
 
 #standardize data sets using Box-Cox transformation
 rasy_dt<-cleandat(as.matrix(rasy_compmat),clev=5,times=keep_years)
@@ -105,12 +107,15 @@ rasy_dt<-cleandat(as.matrix(rasy_compmat),clev=5,times=keep_years)
 png('results/mo_wpmf.png',res=500,height=4,width=5,units="in")
 
 #load custom plotting code
-source('C:/Users/thander/OneDrive - Southern Illinois University Edwardsville/Documents/Projects/RASY/Analysis/wmf_plotting.R')
+source('code/wmf_plotting.R')
 
 rasy.wpmf<-wpmf(rasy_dt$cdat,times=keep_years,sigmethod = "quick")
 
 #plotmag(rasy.wpmf,sigthresh = 0.99,las=1,title="all")
-mo_wpmf<-plotwmf_gg(rasy.wpmf,sigthresh = 0.99)
+mo_wpmf<-plotwmf_gg(rasy.wpmf,sigthresh = 0.99)+
+  labs(x="")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
 mo_wpmf
 dev.off()
 
@@ -119,9 +124,56 @@ rasy.wmf<-wmf(rasy_dt$cdat,times=keep_years)
 
 png('rasy_wmf.png',res=500,height=4,width=5,units="in")
 #plotmag(rasy.wmf,title="all")
-mo_wmf<-plotwmf_gg(rasy.wmf)
+mo_wmf<-plotwmf_gg(rasy.wmf)+
+  labs(x="Year")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
 mo_wmf
 dev.off()
+
+png('results/Fig3_wavs.png',res=600,width=4,height=7,units="in")
+cowplot::plot_grid(mo_wpmf,mo_wmf,labels=c("A","B"),ncol=1)
+dev.off()
+
+#mean fields by hydroperiod
+#convert to matrix
+rasy_ephmat <- rasy_comp %>%
+  filter(Hydroperiod=="ephem")%>%
+  select(-c(pondname,Hydroperiod))
+rasy_permmat <- rasy_comp %>%
+  filter(Hydroperiod=="perm")%>%
+  select(-c(pondname,Hydroperiod))
+#standardize data sets using Box-Cox transformation
+rasy_ephdt<-cleandat(as.matrix(rasy_ephmat),clev=5,times=keep_years)
+rasy_permdt<-cleandat(as.matrix(rasy_permmat),clev=5,times=keep_years)
+
+rasy.ephwpmf<-wpmf(rasy_ephdt$cdat,times=keep_years,sigmethod = "quick")
+mo_ephwpmf<-plotwmf_gg(rasy.ephwpmf,sigthresh = 0.99)+
+  labs(x="",subtitle = "Ephemeral")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
+mo_ephwpmf
+rasy.permwpmf<-wpmf(rasy_permdt$cdat,times=keep_years,sigmethod = "quick")
+mo_permwpmf<-plotwmf_gg(rasy.permwpmf,sigthresh = 0.99)+
+  labs(x="",subtitle = "Ephemeral")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
+mo_permwpmf
+
+rasy.ephwmf<-wmf(rasy_ephdt$cdat,times=keep_years)
+mo_ephwmf<-plotwmf_gg(rasy.ephwmf)+
+  labs(x="Year")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
+mo_ephwmf
+rasy.permwmf<-wmf(rasy_permdt$cdat,times=keep_years)
+mo_permwmf<-plotwmf_gg(rasy.permwmf)+
+  labs(x="Year")+
+  scale_x_continuous(breaks=seq(2006,2026,2),labels=c(2006,"",2010,"",2014,"",2018,"",2022,"",2026))+
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14))
+mo_permwmf
+
+cowplot::plot_grid(mo_ephwpmf,mo_ephwmf,mo_permwpmf,mo_permwmf)
 
 
 # Coherence Testing -------------------------------------------------------

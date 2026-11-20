@@ -242,20 +242,23 @@ window_sites <- function(m, start, end, min_complete = 0.9, max_zero_prop = 1,
 ## with 0, dark = surveyed with count > 0. Sites sorted by number of years.
 ## Optionally outlines a window (start, end) and marks its qualifying sites
 ## (red triangles). Pass the same rules as window_tradeoff() through '...'.
-plot_coverage <- function(m, start = NULL, end = NULL, main = "Survey coverage",
+plot_coverage <- function(m, start = NULL, end = NULL, main = "Survey coverage", label_cex=NULL,
                           ...) {
   ord <- order(rowSums(!is.na(m)), rowSums(m > 0, na.rm = TRUE))
   m2  <- m[ord, , drop = FALSE]
   code <- ifelse(is.na(m2), 1, ifelse(m2 > 0, 3, 2))
   yrs <- as.numeric(colnames(m2))
-  op <- par(mar = c(4, max(4, max(nchar(rownames(m2))) * 0.5), 4.5, 1))
+  lab_cex <- if (is.null(label_cex)) min(1, 30 / nrow(m2)) else label_cex
+  lab_w   <- max(strwidth(rownames(m2), units = "inches", cex = lab_cex))
+  op <- par(mar = c(4, 1, 4.5, 1))
+  par(mai = replace(par("mai"), 2, lab_w + 0.15))   # label width + small gap
   on.exit(par(op))
   image(x = yrs, y = seq_len(nrow(m2)), z = t(code), zlim = c(1, 3),
         col = c("grey88", "#9ecae1", "#08519c"), axes = FALSE,
         xlab = "Year", ylab = "", main = "")
   title(main, line = 2.8)
   axis(1); axis(2, at = seq_len(nrow(m2)), labels = rownames(m2),
-                las = 1, cex.axis = min(1, 30 / nrow(m2)))
+       las = 1, cex.axis = lab_cex,)
   box()
   if (!is.null(start) && !is.null(end)) {
     keep <- rownames(window_sites(m, start, end, ...))
@@ -265,7 +268,7 @@ plot_coverage <- function(m, start = NULL, end = NULL, main = "Survey coverage",
   }
   legend("topleft", fill = c("grey88", "#9ecae1", "#08519c"), bty = "n",
          legend = c("not surveyed", "zero", "> 0"), cex = 0.8, horiz = TRUE,
-         inset = c(0, -0.06), xpd = TRUE)
+         inset = c(-0.02, -0.09), xpd = TRUE)
   invisible(m2)
 }
 

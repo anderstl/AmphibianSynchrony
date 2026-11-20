@@ -1,13 +1,24 @@
-library(climateR) # to get climate date
-library(sf) #to make spatial points
-library(purrr) #for data wrangling
-library(memoise) #for caching data
-library(cachem) #for caching dat
-library(dplyr) #for data wrangling
-library(lubridate) #for date wrangling
-library(ggplot2) #for plotting
+# ---- packages ----
+cran_pkgs <- c("sf", "dplyr", "purrr", "lubridate","tibble", "remotes")
+#package info
+# climateR to get climate data
+#sf to make spatial points
+#purrr and dplyr for data wrangling
+#for data wrangling
+#lubridate for date wrangling
 
-#examine what variable are availabe with climateR
+missing <- cran_pkgs[!cran_pkgs %in% rownames(installed.packages())]
+if (length(missing)) install.packages(missing)
+
+# GitHub-only (installs rnz, ncmeta, AOI dependencies automatically)
+if (!requireNamespace("climateR", quietly = TRUE)) {
+  remotes::install_github("mikejohnson51/climateR")
+}
+
+#load packages
+invisible(lapply(c(cran_pkgs, "climateR"), library, character.only = TRUE))
+
+#examine what variable are available with climateR
 catalog |>
   filter(id == "gridmet") |>
   select(variable, description, units) |>
@@ -22,8 +33,11 @@ if (file.exists("wx_gridmet.rds")) {
   wx <- readRDS("wx_gridmet.rds")
 } else {
   wx <- map(seq_len(nrow(pts)), function(i) {
-    out <- get_gm(pts[i, ], c("tmmn", "tmmx", "pr"), "1987-12-01", "2026-09-30")
-    out$site <- pts$site[i]
+    out <- getGridMET(AOI = pts[i, ],
+                      varname = c("tmmn", "tmmx", "pr"),
+                      startDate = "1999-10-01",
+                      endDate   = "2026-03-31")
+    out$site <- pts$site[i]   # use your own ID column name here
     out
   }) |> list_rbind()
   saveRDS(wx, "gridmet_sites.rds")
@@ -60,14 +74,6 @@ winter_wx <- wx |>
          snow_total2=lag(snow_total, n =2),
          rain_total2 = lag(rain_total, n =2))
 saveRDS(winter_wx,'data/winterwx_gridmet.rds')
-
-ggplot(winter,aes(site,ft_cycles))+geom_boxplot()
-ggplot(winter,aes(site,fdd))+geom_boxplot()
-ggplot(winter,aes(site,tmean_djf))+geom_boxplot()
-
-ggplot(winter,aes(Latitude,tmean_djf))+stat_summary()
-ggplot(winter,aes(Latitude,ft_cycles))+stat_summary()
-ggplot(winter,aes(Latitude,fdd))+stat_summary()
 
 #breeding windows 
 #ct = median day of april 6, first = march 15, last = apr 23 (arietta et al. 2020)
