@@ -250,8 +250,13 @@ rownames(rasy_dt$cdat) <- keep_sites
 colnames(rasy_dt$cdat) <- keep_years       # your vector of years, 2010-2026 or the 17 you use
 
 #load climate predictors
-clim<-runif(21,5,10)
-drv <- matrix(rep(clim, each = nrow(rasy_dt$cdat)), nrow = nrow(rasy_dt$cdat),
+climind<-readRDS("data/climind.rds")
+pdsi_avg<-readRDS("data/pdsi_avg.rds")
+pdsi<-pdsi_avg%>%
+  filter(state_div=="2302" & year%in%keep_years)
+enso<-climind%>%
+  filter(year%in%keep_years)
+drv <- matrix(rep(pdsi$pdsi_lag2, each = nrow(rasy_dt$cdat)), nrow = nrow(rasy_dt$cdat),
               dimnames = list(rownames(rasy_dt$cdat), colnames(rasy_dt$cdat)))
 
 pond_driver_taildep <- map_dfr(pond_ids, function(p) {
@@ -266,6 +271,7 @@ pond_driver_taildep <- map_dfr(pond_ids, function(p) {
 # synchrony shows no distance decay, so a local window would add nothing. We still
 # need one value per pond, since the regression below is pond-level (one row per
 # pond, matched to that pond's driver tail dependence).
+
 M_td_nodiag <- M_taildep
 diag(M_td_nodiag) <- NA   # drop each pond's pairing with itself
 pond_sync_taildep <- tibble(pond = pond_ids,

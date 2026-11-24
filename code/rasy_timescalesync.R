@@ -1,5 +1,4 @@
 ###Author: Tom Anderson
-###Last Updated: November 3, 2026
 
 library(ggplot2)
 library(wsyn)
@@ -66,15 +65,13 @@ sel <- do.call(window_sites, c(list(m, start, end), rules))
 keep_sites <- rownames(sel)
 keep_years <- start:end
 
+#plot time series
 eggs_use <- rasy|>
   select(pondname,X2006:X2026)|>
   pivot_longer(X2006:X2026,names_to="Year",values_to="Count")|>
   mutate(Year=as.numeric(sub('X', '', Year))) |>
   filter(as.character(pondname) %in% keep_sites,
          Year >= start, Year <= end)
-
-#best option is 21 years for 21 sites (2001-2026)
-#plot time series
 ts_plot<-eggs_use%>%
   ggplot(aes(Year,Count,color=pondname))+
   geom_point(show.legend = F)+
@@ -85,20 +82,19 @@ ts_plot<-eggs_use%>%
   scale_x_continuous(breaks=seq(2006,2026,1),labels=c("2006",rep("",3),"2010",rep("",3),"2014",rep("",3),"2018",rep("",3),"2022",rep("",3),"2026"))
 ts_plot
 
-#extract time series back into wide format and impute value with row mean
-rasy_comp<-eggs_use%>%
-  pivot_wider(names_from = "Year",values_from = "Count")%>%
-  mutate(
-    .row_mean = rowMeans(across(-pondname), na.rm = TRUE),
-    across(-c(pondname, .row_mean), ~ coalesce(.x, .row_mean))
-  ) %>%
-  select(-.row_mean)
+#best option is 21 years for 21 sites (2001-2026)
 
-rasy_comp<-merge(rasy_comp,rasy[,c("pondname","Hydroperiod")],by="pondname")
+rasy_comp <- sel %>%
+  as.data.frame()%>%
+  mutate(row_mean = round(rowMeans(select(., `2006`:`2026`), na.rm = TRUE),0),
+         across(`2006`:`2026`, ~ coalesce(., row_mean)))%>%
+  mutate(pondname=row.names(sel))%>%
+  left_join(rasy%>%select(pondname,Latitude,Longitude,Hydroperiod),by="pondname")
 
-#convert to matrix
-rasy_compmat <- rasy_comp %>%
-  select(-c(pondname,Hydroperiod))
+rasy_compmat<-rasy_comp%>%
+  select(`2006`:`2026`)%>%
+  as.matrix()
+#21 sites for 21 years which drops zero inflated ponds
 
 #standardize data sets using Box-Cox transformation
 rasy_dt<-cleandat(as.matrix(rasy_compmat),clev=5,times=keep_years)
@@ -204,7 +200,7 @@ res<-coh(dat1=breedtmin$cdat,dat2=rasy_dt$cdat,times=keep_years,
          f0=1,
          scale.max.input=28)
 
-res<-bandtest(res,c(2,3))
+res<-bandtest(res,c(2,4))
 res<-bandtest(res,c(4,6))
 get_bandp(res)
 plotphase(res)
@@ -718,7 +714,3 @@ par(mfrow=c(1,2))
 plotmag(wt(totaleggs_dt$cdat,2006:2026),title="RASY")
 plotmag(wt(enso_dt_list$postbreed$cdat[1,],times=2006:2026))
 
-#fit arma models of varying time lags using environmental predictors, compare sets up models
-#examine frequncy information from the top models
-
-#build neighborhood competition model
